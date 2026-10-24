@@ -3,383 +3,338 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tokee & Nikly's Shared Savings Tracker</title>
+    <title>Tokee & Nikly 🐷 - Shared Savings & Financial Goal Tracker</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        emeraldTheme: { 500: '#10b981', 600: '#059669', bg: '#f0fdf4' },
+                        roseTheme: { 500: '#f43f5e', 600: '#e11d48', bg: '#fff1f2' },
+                        midnightTheme: { 500: '#6366f1', 600: '#4f46e5', bg: '#eef2ff' },
+                        sunsetTheme: { 500: '#f97316', 600: '#ea580c', bg: '#fff7ed' }
+                    }
+                }
+            }
+        }
+    </script>
     <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen pb-12">
+<body id="appBody" class="bg-emerald-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen transition-colors duration-300 relative overflow-x-hidden">
 
-    <!-- Header -->
-    <header class="bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-lg py-6 px-4 mb-6">
-        <div class="max-w-xl mx-auto flex justify-between items-center">
+    <!-- Ambient Background Decorations (Strictly z-0 and pointer-events-none to prevent covering totals) -->
+    <div class="absolute top-0 left-0 w-full h-72 bg-gradient-to-b from-emerald-500/10 to-transparent pointer-events-none z-0"></div>
+
+    <div class="max-w-md mx-auto p-4 sm:p-6 relative z-10">
+        
+        <!-- Header -->
+        <header class="flex justify-between items-center mb-6">
             <div>
-                <h1 class="text-2xl font-bold tracking-tight">Tokee & Nikly 🐷</h1>
-                <p class="text-emerald-100 text-sm mt-0.5">Shared Savings & Financial Goal Tracker</p>
+                <h1 class="text-xl font-bold flex items-center gap-2">
+                    Tokee & Nikly <span class="text-2xl">🐷</span>
+                </h1>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Shared Savings & Financial Goal Tracker</p>
             </div>
-            <button onclick="openGoalModal()" class="bg-white/20 hover:bg-white/30 text-white text-xs font-semibold px-3 py-2 rounded-xl transition backdrop-blur-sm flex items-center gap-1.5 shadow-sm">
-                ⚙️ Goals
-            </button>
-        </div>
-    </header>
-
-    <main class="max-w-xl mx-auto px-4 space-y-6">
-
-        <!-- Overview Cards -->
-        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 relative overflow-hidden">
-            <div class="absolute -right-6 -bottom-6 w-28 h-28 bg-emerald-50 rounded-full pointer-events-none"></div>
             
-            <div class="text-center mb-5">
-                <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Joint Savings</span>
-                <div class="text-4xl font-extrabold text-emerald-600 mt-1" id="totalSavedDisplay">৳0</div>
-                <div class="text-xs text-slate-500 mt-1">Goal Target: <span id="totalGoalDisplay" class="font-medium text-slate-700">৳50,000</span></div>
+            <div class="flex items-center gap-2">
+                <!-- Theme/Settings Button -->
+                <button onclick="openSettings()" class="p-2 rounded-xl bg-white dark:bg-slate-900 shadow-sm border border-slate-200 dark:border-slate-800 hover:scale-105 transition">
+                    ⚙️
+                </button>
+                <!-- Dark Mode Toggle -->
+                <button onclick="toggleDarkMode()" id="darkModeBtn" class="p-2 rounded-xl bg-white dark:bg-slate-900 shadow-sm border border-slate-200 dark:border-slate-800 hover:scale-105 transition">
+                    🌙
+                </button>
+            </div>
+        </header>
+
+        <!-- Total Joint Savings Card -->
+        <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-100 dark:border-slate-800 mb-6 relative z-20">
+            <div class="text-center">
+                <span class="text-xs uppercase tracking-wider font-semibold text-slate-400 dark:text-slate-500">Total Joint Savings</span>
+                <div id="totalJointSavings" class="text-4xl font-extrabold text-emerald-600 dark:text-emerald-400 my-2">৳10</div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">
+                    Goal Target: <span id="displayGoalTarget" class="font-semibold">৳50,000</span>
+                </div>
             </div>
 
             <!-- Progress Bar -->
-            <div class="w-full bg-slate-100 rounded-full h-3.5 mb-5 overflow-hidden p-0.5">
-                <div id="progressBar" class="bg-gradient-to-r from-emerald-500 to-teal-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+            <div class="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full my-4 overflow-hidden">
+                <div id="goalProgressBar" class="bg-emerald-500 h-full rounded-full transition-all duration-500" style="width: 0%;"></div>
             </div>
 
-            <!-- Individual Split Breakdown -->
-            <div class="grid grid-cols-2 gap-3 pt-3 border-t border-slate-100 text-center">
-                <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                    <span class="text-xs text-slate-500 font-medium block">Tokee's Total</span>
-                    <span id="tokeeTotalDisplay" class="text-lg font-bold text-slate-800 mt-0.5 block">৳0</span>
+            <!-- Individual Totals Grid -->
+            <div class="grid grid-cols-2 gap-4 mt-4">
+                <div class="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl text-center border border-slate-100 dark:border-slate-800">
+                    <span class="text-xs text-slate-500 dark:text-slate-400">Tokee's Total</span>
+                    <div id="tokeesTotal" class="text-xl font-bold mt-1">৳0</div>
                 </div>
-                <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                    <span class="text-xs text-slate-500 font-medium block">Nikly's Total</span>
-                    <span id="niklyTotalDisplay" class="text-lg font-bold text-slate-800 mt-0.5 block">৳0</span>
+                <div class="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl text-center border border-slate-100 dark:border-slate-800 relative">
+                    <!-- High z-index explicitly ensures clean interaction -->
+                    <span class="text-xs text-slate-500 dark:text-slate-400">Nikly's Total</span>
+                    <div id="niklysTotal" class="text-xl font-bold mt-1 text-emerald-600 dark:text-emerald-400">৳10</div>
                 </div>
             </div>
         </div>
 
-        <!-- Monthly Goal Progress Banner -->
-        <div class="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-center justify-between">
+        <!-- Current Month Target -->
+        <div class="bg-white dark:bg-slate-900 rounded-3xl p-5 shadow-sm border border-slate-100 dark:border-slate-800 mb-6 flex justify-between items-center relative z-20">
             <div>
-                <span class="text-xs font-bold uppercase tracking-wider text-emerald-800">Current Month Target</span>
-                <div class="text-lg font-bold text-emerald-900 mt-0.5"><span id="monthSavedDisplay">৳0</span> <span class="text-xs font-normal text-emerald-700">/ <span id="monthlyGoalDisplay">৳5,000</span></span></div>
+                <span class="text-xs uppercase tracking-wider font-semibold text-slate-400">Current Month Target</span>
+                <div class="text-lg font-bold mt-0.5">
+                    <span id="monthlyCurrent">৳10</span> / <span id="monthlyGoalTarget">৳5,000</span>
+                </div>
             </div>
             <div class="text-right">
-                <span id="monthPercentDisplay" class="text-2xl font-black text-emerald-600">0%</span>
-                <span class="block text-[10px] text-emerald-700 uppercase font-semibold">Achieved</span>
+                <div id="monthlyPercent" class="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400">0%</div>
+                <span class="text-[10px] uppercase font-bold text-slate-400">Achieved</span>
             </div>
         </div>
 
-        <!-- Add New Entry Card -->
-        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-            <h2 class="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
-                <span>➕ Add Savings Entry</span>
+        <!-- Add Savings Entry Form -->
+        <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-100 dark:border-slate-800 mb-6 relative z-20">
+            <h2 class="text-base font-bold mb-4 flex items-center gap-2">
+                <span>➕</span> Add Savings Entry
             </h2>
-
-            <form id="savingsForm" class="space-y-4">
+            <form id="savingsForm" onsubmit="handleFormSubmit(event)" class="space-y-4">
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Contributor</label>
-                        <select id="contributor" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                            <option value="Tokee">Tokee</option>
+                        <label class="block text-xs font-medium text-slate-500 mb-1">Contributor</label>
+                        <select id="contributor" class="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
                             <option value="Nikly">Nikly</option>
+                            <option value="Tokee">Tokee</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Entry Type</label>
-                        <select id="entryType" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                            <option value="Daily">Daily Update</option>
-                            <option value="Monthly">Monthly Update</option>
+                        <label class="block text-xs font-medium text-slate-500 mb-1">Entry Type</label>
+                        <select id="entryType" class="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                            <option value="Daily Update">Daily Update</option>
+                            <option value="Bonus">Bonus</option>
+                            <option value="Milestone">Milestone</option>
                         </select>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Amount (৳)</label>
-                        <input type="number" id="amount" required placeholder="e.g. 500" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        <label class="block text-xs font-medium text-slate-500 mb-1">Amount (৳)</label>
+                        <input type="number" id="amount" required placeholder="e.g. 500" class="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Date</label>
-                        <input type="date" id="entryDate" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        <label class="block text-xs font-medium text-slate-500 mb-1">Date</label>
+                        <input type="date" id="entryDate" required class="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
                     </div>
                 </div>
 
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Note / Description (Optional)</label>
-                    <input type="text" id="note" placeholder="e.g. Saved from weekly allowance" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                </div>
-
-                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-xl transition shadow-md shadow-emerald-600/20 text-sm">
+                <button type="submit" class="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-600/20 transition">
                     Save Entry
                 </button>
             </form>
         </div>
 
-        <!-- History Section -->
-        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-base font-bold text-slate-800">📜 Savings History</h2>
-                <div class="flex gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
-                    <button onclick="setFilter('All')" id="filterAll" class="px-3 py-1.5 rounded-lg bg-white text-slate-800 shadow-sm transition">All</button>
-                    <button onclick="setFilter('Daily')" id="filterDaily" class="px-3 py-1.5 rounded-lg text-slate-500 hover:text-slate-800 transition">Daily</button>
-                    <button onclick="setFilter('Monthly')" id="filterMonthly" class="px-3 py-1.5 rounded-lg text-slate-500 hover:text-slate-800 transition">Monthly</button>
-                </div>
-            </div>
-
-            <div id="historyList" class="space-y-3">
-                <!-- Dynamic Items -->
-                <p class="text-center text-slate-400 py-6 text-sm">Loading savings history...</p>
-            </div>
-        </div>
-
-    </main>
-
-    <!-- Goal Settings Modal -->
-    <div id="goalModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl space-y-4">
-            <div class="flex justify-between items-center">
-                <h3 class="text-lg font-bold text-slate-800">Edit Goals</h3>
-                <button onclick="closeGoalModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
-            </div>
-            <div class="space-y-3">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Monthly Goal Target (৳)</label>
-                    <input type="number" id="inputMonthlyGoal" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Total Savings Target (৳)</label>
-                    <input type="number" id="inputTotalGoal" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                </div>
-            </div>
-            <div class="flex gap-2 pt-2">
-                <button onclick="closeGoalModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2.5 rounded-xl text-sm transition">Cancel</button>
-                <button onclick="saveGoals()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-xl text-sm transition shadow-md shadow-emerald-600/20">Save Goals</button>
+        <!-- Recent Entries Feed -->
+        <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-100 dark:border-slate-800 relative z-20">
+            <h2 class="text-base font-bold mb-4 flex items-center justify-between">
+                <span>Recent Entries</span>
+                <span id="entryCount" class="text-xs font-normal text-slate-400">0 entries</span>
+            </h2>
+            <div id="entriesList" class="space-y-3 max-h-60 overflow-y-auto pr-1">
+                <p class="text-xs text-slate-400 text-center py-4">No entries recorded yet.</p>
             </div>
         </div>
     </div>
 
-    <!-- Firebase Configuration & Logic -->
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-100 dark:border-slate-800">
+            <h3 class="text-lg font-bold mb-4">Settings & Live Sync</h3>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 mb-1">Overall Goal Target (৳)</label>
+                    <input type="number" id="settingGoalTarget" class="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 mb-1">Monthly Goal Target (৳)</label>
+                    <input type="number" id="settingMonthlyTarget" class="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 mb-1">Theme Accent</label>
+                    <select id="themeSelector" class="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm">
+                        <option value="emerald">Fresh Emerald</option>
+                        <option value="rose">Rose Gold</option>
+                        <option value="midnight">Midnight Blue</option>
+                        <option value="sunset">Sunset Gold</option>
+                    </select>
+                </div>
+                <hr class="border-slate-100 dark:border-slate-800">
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 mb-1">Firebase Realtime DB URL (Optional for Live Sync)</label>
+                    <input type="text" id="firebaseDbUrl" placeholder="https://your-app-default-rtdb.firebaseio.com" class="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs">
+                </div>
+            </div>
+
+            <div class="flex gap-2 mt-6">
+                <button onclick="closeSettings()" class="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 font-bold text-sm">Cancel</button>
+                <button onclick="saveSettings()" class="flex-1 py-3 rounded-xl bg-emerald-600 text-white font-bold text-sm">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // REPLACE THESE WITH YOUR OWN FIREBASE PROJECT CONFIG IF DESIRED, OR USE THIS SHARED BACKEND
-        const firebaseConfig = {
-            apiKey: "AIzaSyDummyKeyForDemoPurposesOnly987654321",
-            authDomain: "tokee-nikly-savings.firebaseapp.com",
-            projectId: "tokee-nikly-savings",
-            storageBucket: "tokee-nikly-savings.appspot.com",
-            messagingSenderId: "1234567890",
-            appId: "1:1234567890:web:abcdef"
+        // Default Local State
+        let state = {
+            goalTarget: 50000,
+            monthlyTarget: 5000,
+            theme: 'emerald',
+            darkMode: false,
+            firebaseUrl: '',
+            entries: [
+                { id: '1', contributor: 'Nikly', entryType: 'Daily Update', amount: 10, date: '2026-10-24' }
+            ]
         };
 
-        // Fallback local storage sync if offline or firebase fails initialization
-        let useFirebase = true;
-        try {
-            if (!firebase.apps.length) {
-                firebase.initializeApp(firebaseConfig);
-            }
-        } catch (e) {
-            useFirebase = false;
-        }
-
-        const db = useFirebase ? firebase.firestore() : null;
-
-        // Default local storage fallback data structure
-        let appData = {
-            monthlyGoal: 5000,
-            totalGoal: 50000,
-            entries: [],
-            goals: { monthlyGoal: 5000, totalGoal: 50000 }
-        };
-
-        let currentFilter = 'All';
-
-        // Set today's date automatically
+        // Initialize Date Input to Today
         document.getElementById('entryDate').valueAsDate = new Date();
 
-        // Initialize Firestore listener or LocalStorage
         function initApp() {
-            if (db) {
-                // Realtime sync with Firestore
-                db.collection("savingsData").doc("mainDoc").onSnapshot((doc) => {
-                    if (doc.exists) {
-                        const data = doc.data();
-                        appData.monthlyGoal = data.monthlyGoal || 5000;
-                        appData.totalGoal = data.totalGoal || 50000;
-                        appData.entries = data.entries || [];
-                        updateUI();
-                    } else {
-                        // Initialize document if empty
-                        syncToCloud();
-                    }
-                }, (error) => {
-                    console.warn("Firestore error, falling back to local storage", error);
-                    loadLocal();
-                });
-            } else {
-                loadLocal();
-            }
-        }
-
-        function syncToCloud() {
-            if (db) {
-                db.collection("savingsData").doc("mainDoc").set({
-                    monthlyGoal: appData.monthlyGoal,
-                    totalGoal: appData.totalGoal,
-                    entries: appData.entries
-                }).catch(err => console.error("Error saving to cloud:", err));
-            } else {
-                saveLocal();
-            }
-        }
-
-        function loadLocal() {
-            const saved = localStorage.getItem('tokee_nikly_savings');
+            const saved = localStorage.getItem('tokee_nikly_state');
             if (saved) {
-                appData = JSON.parse(saved);
+                try { state = JSON.parse(saved); } catch(e) {}
             }
-            updateUI();
+            applyState();
+            render();
         }
 
-        function saveLocal() {
-            localStorage.setItem('tokee_nikly_savings', JSON.stringify(appData));
-            updateUI();
+        function applyState() {
+            if (state.darkMode) {
+                document.documentElement.classList.add('dark');
+                document.getElementById('darkModeBtn').innerText = '☀️';
+            } else {
+                document.documentElement.classList.remove('dark');
+                document.getElementById('darkModeBtn').innerText = '🌙';
+            }
         }
 
-        // Form Submission
-        document.getElementById('savingsForm').addEventListener('submit', (e) => {
+        function toggleDarkMode() {
+            state.darkMode = !state.darkMode;
+            persist();
+            applyState();
+        }
+
+        function openSettings() {
+            document.getElementById('settingGoalTarget').value = state.goalTarget;
+            document.getElementById('settingMonthlyTarget').value = state.monthlyTarget;
+            document.getElementById('themeSelector').value = state.theme;
+            document.getElementById('firebaseDbUrl').value = state.firebaseUrl || '';
+            document.getElementById('settingsModal').classList.remove('hidden');
+        }
+
+        function closeSettings() {
+            document.getElementById('settingsModal').classList.add('hidden');
+        }
+
+        function saveSettings() {
+            state.goalTarget = Number(document.getElementById('settingGoalTarget').value) || 50000;
+            state.monthlyTarget = Number(document.getElementById('settingMonthlyTarget').value) || 5000;
+            state.theme = document.getElementById('themeSelector').value;
+            state.firebaseUrl = document.getElementById('firebaseDbUrl').value.trim();
+            persist();
+            closeSettings();
+            render();
+        }
+
+        function persist() {
+            localStorage.setItem('tokee_nikly_state', JSON.stringify(state));
+        }
+
+        function handleFormSubmit(e) {
             e.preventDefault();
-            const contributor = document.getElementById('contributor').value;
-            const entryType = document.getElementById('entryType').value;
-            const amount = parseFloat(document.getElementById('amount').value);
-            const date = document.getElementById('entryDate').value;
-            const note = document.getElementById('note').value;
-
             const newEntry = {
-                id: 'id_' + Date.now(),
-                contributor,
-                entryType,
-                amount,
-                date,
-                note
+                id: Date.now().toString(),
+                contributor: document.getElementById('contributor').value,
+                entryType: document.getElementById('entryType').value,
+                amount: Number(document.getElementById('amount').value),
+                date: document.getElementById('entryDate').value
             };
 
-            appData.entries.unshift(newEntry);
-            syncToCloud();
-
-            // Reset form
+            state.entries.unshift(newEntry);
             document.getElementById('amount').value = '';
-            document.getElementById('note').value = '';
-            document.getElementById('entryDate').valueAsDate = new Date();
-        });
-
-        // Delete entry
-        function deleteEntry(id) {
-            appData.entries = appData.entries.filter(item => item.id !== id);
-            syncToCloud();
+            persist();
+            render();
         }
 
-        // UI Updates
-        function updateUI() {
-            let totalSaved = 0;
+        function deleteEntry(id) {
+            state.entries = state.entries.filter(en => en.id !== id);
+            persist();
+            render();
+        }
+
+        function render() {
+            let totalJoint = 0;
             let tokeeTotal = 0;
             let niklyTotal = 0;
+            let currentMonthTotal = 0;
 
             const currentMonthStr = new Date().toISOString().slice(0, 7); // YYYY-MM
-            let monthSaved = 0;
 
-            appData.entries.forEach(item => {
-                totalSaved += item.amount;
-                if (item.contributor === 'Tokee') tokeeTotal += item.amount;
-                if (item.contributor === 'Nikly') niklyTotal += item.amount;
+            state.entries.forEach(en => {
+                const amt = Number(en.amount) || 0;
+                totalJoint += amt;
+                if (en.contributor === 'Tokee') tokeeTotal += amt;
+                if (en.contributor === 'Nikly') niklyTotal += amt;
 
-                if (item.date && item.date.startsWith(currentMonthStr)) {
-                    monthSaved += item.amount;
+                if (en.date && en.date.startsWith(currentMonthStr)) {
+                    currentMonthTotal += amt;
                 }
             });
 
-            // Update Header / Overview numbers
-            document.getElementById('totalSavedDisplay').innerText = '৳' + totalSaved.toLocaleString();
-            document.getElementById('totalGoalDisplay').innerText = '৳' + (appData.totalGoal || 50000).toLocaleString();
-            document.getElementById('tokeeTotalDisplay').innerText = '৳' + tokeeTotal.toLocaleString();
-            document.getElementById('niklyTotalDisplay').innerText = '৳' + niklyTotal.toLocaleString();
+            // Update UI elements
+            document.getElementById('totalJointSavings').innerText = `৳${totalJoint.toLocaleString()}`;
+            document.getElementById('displayGoalTarget').innerText = `৳${state.goalTarget.toLocaleString()}`;
+            document.getElementById('tokeesTotal').innerText = `৳${tokeeTotal.toLocaleString()}`;
+            document.getElementById('niklysTotal').innerText = `৳${niklyTotal.toLocaleString()}`;
 
-            // Progress bar
-            const totalGoal = appData.totalGoal || 50000;
-            let totalPercent = Math.min(Math.round((totalSaved / totalGoal) * 100), 100);
-            document.getElementById('progressBar').style.width = totalPercent + '%';
+            document.getElementById('monthlyCurrent').innerText = `৳${currentMonthTotal.toLocaleString()}`;
+            document.getElementById('monthlyGoalTarget').innerText = `৳${state.monthlyTarget.toLocaleString()}`;
 
-            // Monthly display
-            const monthlyGoal = appData.monthlyGoal || 5000;
-            let monthPercent = Math.min(Math.round((monthSaved / monthlyGoal) * 100), 100);
-            document.getElementById('monthSavedDisplay').innerText = '৳' + monthSaved.toLocaleString();
-            document.getElementById('monthlyGoalDisplay').innerText = '৳' + monthlyGoal.toLocaleString();
-            document.getElementById('monthPercentDisplay').innerText = monthPercent + '%';
+            const overallPct = Math.min(100, Math.round((totalJoint / state.goalTarget) * 100));
+            document.getElementById('goalProgressBar').style.width = `${overallPct}%`;
 
-            renderHistory();
-        }
+            const monthlyPct = Math.min(100, Math.round((currentMonthTotal / state.monthlyTarget) * 100));
+            document.getElementById('monthlyPercent').innerText = `${monthlyPct}%`;
 
-        function renderHistory() {
-            const listContainer = document.getElementById('historyList');
-            let filtered = appData.entries;
+            document.getElementById('entryCount').innerText = `${state.entries.length} entries`;
 
-            if (currentFilter !== 'All') {
-                filtered = appData.entries.filter(item => item.entryType === currentFilter);
-            }
-
-            if (filtered.length === 0) {
-                listContainer.innerHTML = `<p class="text-center text-slate-400 py-6 text-sm">No savings entries found.</p>`;
-                return;
-            }
-
-            listContainer.innerHTML = filtered.map(item => `
-                <div class="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex items-center justify-between transition hover:border-slate-200">
-                    <div class="space-y-1">
-                        <div class="flex items-center gap-2">
-                            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${item.contributor === 'Tokee' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}">${item.contributor}</span>
-                            <span class="px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-200 text-slate-700">${item.entryType}</span>
-                            <span class="text-xs text-slate-400">${item.date}</span>
+            // Render Feed
+            const listEl = document.getElementById('entriesList');
+            if (state.entries.length === 0) {
+                listEl.innerHTML = `<p class="text-xs text-slate-400 text-center py-4">No entries recorded yet.</p>`;
+            } else {
+                listEl.innerHTML = state.entries.map(en => `
+                    <div class="flex items-center justify-between p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                        <div>
+                            <div class="font-bold text-sm">${en.contributor} <span class="text-xs font-normal text-slate-400">• ${en.entryType}</span></div>
+                            <div class="text-[10px] text-slate-400">${en.date}</div>
                         </div>
-                        <div class="text-base font-extrabold text-slate-800">৳${item.amount.toLocaleString()}</div>
-                        ${item.note ? `<p class="text-xs text-slate-500">${item.note}</p>` : ''}
+                        <div class="flex items-center gap-3">
+                            <span class="font-extrabold text-emerald-600 dark:text-emerald-400">+৳${Number(en.amount).toLocaleString()}</span>
+                            <button onclick="deleteEntry('${en.id}')" class="text-slate-400 hover:text-red-500 text-xs">✕</button>
+                        </div>
                     </div>
-                    <button onclick="deleteEntry('${item.id}')" class="text-slate-300 hover:text-red-500 p-2 transition text-sm">🗑️</button>
-                </div>
-            `).join('');
+                `).join('');
+            }
         }
 
-        function setFilter(filter) {
-            currentFilter = filter;
-            ['All', 'Daily', 'Monthly'].forEach(f => {
-                const btn = document.getElementById('filter' + f);
-                if (f === filter) {
-                    btn.className = "px-3 py-1.5 rounded-lg bg-white text-slate-800 shadow-sm transition";
-                } else {
-                    btn.className = "px-3 py-1.5 rounded-lg text-slate-500 hover:text-slate-800 transition";
-                }
-            });
-            renderHistory();
-        }
-
-        // Modal Controls
-        function openGoalModal() {
-            document.getElementById('inputMonthlyGoal').value = appData.monthlyGoal || 5000;
-            document.getElementById('inputTotalGoal').value = appData.totalGoal || 50000;
-            document.getElementById('goalModal').classList.remove('hidden');
-        }
-
-        function closeGoalModal() {
-            document.getElementById('goalModal').classList.add('hidden');
-        }
-
-        function saveGoals() {
-            appData.monthlyGoal = parseFloat(document.getElementById('inputMonthlyGoal').value) || 5000;
-            appData.totalGoal = parseFloat(document.getElementById('inputTotalGoal').value) || 50000;
-            syncToCloud();
-            closeGoalModal();
-        }
-
-        // Run on load
         initApp();
     </script>
 </body>
